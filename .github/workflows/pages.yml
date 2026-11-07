@@ -1,0 +1,123 @@
+name: Refresh data and deploy Pages
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    # Every Monday at 03:30 UTC: rediscover repos, relabel new/changed ones, snapshot stars, commit data/, deploy
+    - cron: "30 3 * * 1"
+  workflow_dispatch:
+    inputs:
+      refresh_data:
+        description: "Run the data pipeline before deploying"
+        required: false
+        default: true
+        type: boolean
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      - name: Install dependencies
+        run: python -m pip install -r requirements.txt
+
+      - name: Run unit tests
+        run: python -m unittest discover -s pipeline/tests -v
+
+      - name: Refresh data (discover, enrich, classify, snapshot)
+        id: refresh
+        if: github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.refresh_data)
+        continue-on-error: true            # a failed refresh still deploys the previous data
+        timeout-minutes: 55                # discover ~5 min + enrich ~2 min + classify waits at most 30 min
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          SS_CLASSIFY_MAX_WAIT: "1800"     # one shared budget for collecting a pending batch + a new one
+        run: bash deploy/update.sh
+
+      - name: Restore previous data after a failed refresh (keep paid labels)
+        if: steps.refresh.outcome == 'failure'
+        run: |
+          echo "::warning::Data refresh failed or timed out; deploying the previously committed data."
+          KEEP="$(mktemp -d)"
+          # data/labels/ caches paid LLM labels and the id of any in-flight batch: keep it if it parses
+          if python -c "import json; json.load(open('data/labels/labels.json'))" 2>/dev/null; then
+            cp -R data/labels "$KEEP/labels"
+          fi
+          git checkout -- data/
+          git clean -fdq data/
+          if [ -d "$KEEP/labels" ]; then rm -rf data/labels && cp -R "$KEEP/labels" data/labels; fi
+
+      - name: Commit updated data as github-actions[bot]
+        if: ${{ !cancelled() && (steps.refresh.outcome == 'success' || steps.refresh.outcome == 'failure') }}
+        continue-on-error: true            # a push problem (race, branch protection) must not block the deploy
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/
+          if git diff --cached --quiet; then
+            echo "No data changes to commit."
+            exit 0
+          fi
+          if [ "${{ steps.refresh.outcome }}" = success ]; then
+            git commit -q -m "chore(data): weekly refresh $(date -u +%Y-%m-%d)"
+          else
+            git commit -q -m "chore(data): keep labels and batch state from failed refresh $(date -u +%Y-%m-%d)"
+          fi
+          # Only data/ changes here. If main moved meanwhile, replay on top of it and let this run's data win
+          # conflicts inside data/ (in a rebase, -X theirs means the commit being replayed: ours).
+          for attempt in 1 2 3; do
+            if git pull -q --rebase -X theirs origin main && git push -q origin HEAD:main; then
+              echo "Pushed data commit."
+              exit 0
+            fi
+            git rebase --abort 2>/dev/null || true
+            sleep $((attempt * 15))
+          done
+          echo "::warning::Could not push the data commit (branch protection or a persistent conflict). This deploy uses the refreshed data anyway; next week's run recomputes it."
+          exit 1
+
+      - name: Set up Pages
+        id: pages
+        uses: actions/configure-pages@v5
+
+      - name: Build site
+        env:
+          SS_BASE_URL: ${{ steps.pages.outputs.base_url }}
+        run: python pipeline/build_site_data.py --out site_dist
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site_dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

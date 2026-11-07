@@ -1,0 +1,37 @@
+# Hand-curated repos that searches can miss. One owner/name per line; '#' starts a comment.
+# They still have to pass the inclusion rule (>= 10,000 stars, not archived, not a fork).
+anthropics/skills
+anthropics/claude-code
+anthropics/claude-cookbooks
+modelcontextprotocol/servers
+modelcontextprotocol/python-sdk
+modelcontextprotocol/typescript-sdk
+punkpeye/awesome-mcp-servers
+hesreallyhim/awesome-claude-code
+obra/superpowers
+PatrickJS/awesome-cursorrules
+f/prompts.chat
+x1xhlol/system-prompts-and-models-of-ai-tools
+dair-ai/Prompt-Engineering-Guide
+langchain-ai/langchain
+langchain-ai/langgraph
+run-llama/llama_index
+microsoft/autogen
+crewAIInc/crewAI
+openai/openai-agents-python
+openai/codex
+google-gemini/gemini-cli
+browser-use/browser-use
+microsoft/playwright-mcp
+mem0ai/mem0
+langfuse/langfuse
+e2b-dev/awesome-ai-agents
+Significant-Gravitas/AutoGPT
+FoundationAgents/MetaGPT
+OpenHands/OpenHands
+cline/cline
+Aider-AI/aider
+unclecode/crawl4ai
+firecrawl/firecrawl
+upstash/context7
+github/github-mcp-server

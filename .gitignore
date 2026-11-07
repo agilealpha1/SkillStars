@@ -1,0 +1,11 @@
+# build output (rebuilt by pipeline/build_site_data.py; CI deploys it)
+site_dist/
+site_dist.tmp/
+# re-fetchable HTTP cache, backups, scratch
+.cache/
+*.tmp
+# python / os
+__pycache__/
+*.pyc
+.DS_Store
+.venv/

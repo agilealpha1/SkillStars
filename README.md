@@ -20,7 +20,6 @@ RAG and memory, browser and computer use, evals, and the `awesome-*` lists about
 [**Browse the catalog**](https://agilealpha1.github.io/SkillStars/) ·
 [How it works](#-how-it-works) ·
 [Run locally](#-quick-start) ·
-[Deploy your own](#-deploy-to-github-pages) ·
 [Download the data](#-data-and-license)
 
 </div>
@@ -144,42 +143,6 @@ pages are cached in `.cache/search/` for 20 hours, so an interrupted run resumes
 | `SS_BASE_URL` | `./` | Absolute site URL used in the feed (set by CI) |
 
 </details>
-
-## 🌍 Deploy to GitHub Pages
-
-1. Fork this repo or push it to a repo named `SkillStars` on `main`.
-2. **Settings → Pages → Source: GitHub Actions.**
-3. Optional: **Settings → Secrets and variables → Actions → New secret** `ANTHROPIC_API_KEY`.
-   `GITHUB_TOKEN` is built in; nothing to add.
-4. Run the workflow once from the **Actions** tab (*Refresh data and deploy Pages → Run workflow*).
-
-[`.github/workflows/pages.yml`](.github/workflows/pages.yml) deploys on every push to `main`, and runs the full
-pipeline every **Monday at 03:30 UTC** and on manual dispatch. The scheduled run tests the code, refreshes `data/`,
-commits it as `github-actions[bot]`, builds the site and deploys it. Pushes by the bot don't trigger another run.
-
-### 🛡️ When something fails, the old data stays
-
-- `discover.py` refuses to overwrite `data/candidates.json` if the new list is under 70% of the old one
-  (an outage or bad token shouldn't wipe the catalog).
-- Every data file is written atomically (temp file + rename).
-- If discovery or enrichment fails, `deploy/update.sh` puts `candidates.json` and `repos.jsonl` back to their
-  pre-run versions (so the two always match) and skips the snapshot, so weekly gains are never computed from stale
-  numbers. If the final validation build fails, all of `data/` is restored.
-- `data/labels/` (paid LLM labels and the id of an in-flight Anthropic batch) is never rolled back, locally or in
-  CI, so a failed run can't orphan a batch or pay for the same labels twice.
-- `classify.py` has one time budget per run (`SS_CLASSIFY_MAX_WAIT`, 30 min in CI) shared by collecting last week's
-  batch and waiting on a new one. A batch that outlives it is saved and collected next week; expired, deleted or
-  repeatedly unreadable batches are dropped and resubmitted. API calls retry on 429/5xx/529.
-- In CI the refresh step has a 55-minute timeout and `continue-on-error`; the commit step retries its push three
-  times (replaying the bot's `data/` commit on top of any new commits) and a failed push only logs a warning.
-  Either way the deploy still runs.
-- `build_site_data.py` builds into `site_dist.tmp/`, validates the schema (including that every link is http/https),
-  and only then replaces `site_dist/`. If the job fails before deploying, Pages keeps the last good deployment.
-
-### 🔗 Links from GitHub metadata
-
-Repo homepages are free text set by owners. The pipeline and the page both accept only `http(s)` URLs, add
-`https://` to bare domains (`flashml.ai`), and drop anything else (`javascript:`, `data:`, ...).
 
 ## 🎯 Scope and taxonomy
 

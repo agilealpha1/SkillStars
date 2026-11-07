@@ -163,19 +163,6 @@ Each repo page shows which method labeled it.
 > **Missing a repo?** Add it to [`pipeline/seeds.txt`](pipeline/seeds.txt). Seeds are always in scope.
 > Wrong category? Open an issue.
 
-## 💸 Costs
-
-Target: **\$0**, apart from a few cents of Haiku.
-
-| Item | Cost |
-|---|---|
-| GitHub Actions (public repo), GitHub Pages, GitHub API with the built-in token | free |
-| Claude Haiku, first full labeling (~1,050 candidates, ~1.6M input tokens at Batches API prices) | ~\$1, once |
-| Claude Haiku, weekly (only repos that are new or whose README excerpt changed) | typically \$0.05–0.25 |
-| No `ANTHROPIC_API_KEY` | \$0 (keyword rules) |
-
-`classify.py` prints the estimate before submitting. `SS_LABEL_MODEL` switches the model.
-
 ## 🧪 Tests
 
 ```bash
